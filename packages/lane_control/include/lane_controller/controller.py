@@ -31,9 +31,16 @@ class LaneController:
     def __init__(self, parameters):
         self.parameters = parameters
         self.d_I = 0.0
+        self.d_D = 0.0
         self.phi_I = 0.0
+        self.phi_D = 0.0
+
         self.prev_d_err = 0.0
         self.prev_phi_err = 0.0
+        self.prev_d = 0.0
+        self.prev_phi = 0.0
+        self._derivative_initialized = False
+
 
     def update_parameters(self, parameters):
         """Updates parameters of LaneController object.
@@ -43,7 +50,7 @@ class LaneController:
         """
         self.parameters = parameters
 
-    def compute_control_action(self, d_err, phi_err, dt, wheels_cmd_exec, stop_line_distance):
+    def compute_control_action(self, d_err, phi_err, dt, wheels_cmd_exec, stop_line_distance, pose_msg):
         """Main function, computes the control action given the current error signals.
 
         Given an estimate of the error, computes a control action (tuple of linear and angular velocity). This is done
@@ -63,6 +70,7 @@ class LaneController:
 
         if dt is not None:
             self.integrate_errors(d_err, phi_err, dt)
+            self.differentiate_errors(d_err, phi_err, dt, pose_msg)
 
         self.d_I = self.adjust_integral(
             d_err, self.d_I, self.parameters["~integral_bounds"]["d"], self.parameters["~d_resolution"]
@@ -74,18 +82,40 @@ class LaneController:
             self.parameters["~phi_resolution"],
         )
 
+        self.d_D = self.adjust_derivative(d_err, self.d_D, self.parameters["~derivative_bounds"]["d"],
+            self.parameters["~d_resolution"])
+        self.phi_D = self.adjust_derivative(
+            phi_err,
+            self.phi_D,
+            self.parameters["~derivative_bounds"]["phi"],
+            self.parameters["~phi_resolution"],
+        )
+
         self.reset_if_needed(d_err, phi_err, wheels_cmd_exec)
 
         # Scale the parameters linear such that their real value is at 0.22m/s
-        omega = (
-            self.parameters["~k_d"].value * d_err
-            + self.parameters["~k_theta"].value * phi_err
-            + self.parameters["~k_Id"].value * self.d_I
-            + self.parameters["~k_Iphi"].value * self.phi_I
-        )
+        if self._derivative_initialized:
+            omega = (
+                self.parameters["~k_d"].value * d_err
+                + self.parameters["~k_theta"].value * phi_err
+                + self.parameters["~k_Id"].value * self.d_I
+                + self.parameters["~k_Iphi"].value * self.phi_I
+                + self.parameters["~k_Dd"].value * self.d_D
+                + self.parameters["~k_Dphi"].value * self.phi_D
+            )
+        else:
+            omega = (
+                self.parameters["~k_d"].value * d_err
+                + self.parameters["~k_theta"].value * phi_err
+                + self.parameters["~k_Id"].value * self.d_I
+                + self.parameters["~k_Iphi"].value * self.phi_I
+            )
+            self._derivative_initialized = True
 
         self.prev_d_err = d_err
         self.prev_phi_err = phi_err
+        self.prev_d = pose_msg.d
+        self.prev_phi = pose_msg.phi
 
         v = self.compute_velocity(stop_line_distance)
 
@@ -145,7 +175,39 @@ class LaneController:
         if wheels_cmd_exec[0] == 0 and wheels_cmd_exec[1] == 0:
             self.d_I = 0
             self.phi_I = 0
+            self._derivative_initialized = False
+        
 
+    def differentiate_errors(self, d_err, phi_err, dt, pose_msg):
+        """
+        Differentiates error signals in lateral and heading direction.
+
+        Args:
+            d_err (:obj:`float`): error in meters in the lateral direction
+            phi_err (:obj:`float`): error in radians in the heading direction
+            dt (:obj:`float`): time delay in seconds
+            current_lane_pose (:obj:`duckietown_msgs.msg.LanePose`): the
+                current pose in the lane
+        """
+        if not self._derivative_initialized:
+            # First time step, no derivative to calculate
+            return
+
+        if self.parameters["~deriv_type"] == "value":
+            # Calculate the derivative based on values (as negative velocity)
+            self.d_D = (pose_msg.d - self.prev_d) / dt
+            self.phi_D = (pose_msg.phi - self.prev_phi) / dt
+
+        elif self.parameters["~deriv_type"] == "error":
+            # Calculate the derivative based on errors
+            self.d_D = (d_err - self.prev_d_err) / dt
+            self.phi_D = (phi_err - self.prev_phi_err) / dt
+        else:
+            deriv_type = self.parameters["~deriv_type"]
+            raise NotImplementedError(
+                f"deriv_type {deriv_type} not implemented",
+            )
+        
     @staticmethod
     def adjust_integral(error, integral, bounds, resolution):
         """Bounds the integral error to avoid windup.
@@ -169,3 +231,31 @@ class LaneController:
         elif abs(error) < resolution:
             integral = 0
         return integral
+    
+    @staticmethod
+    def adjust_derivative(error, derivative, bounds, resolution):
+        """
+        Bounds and sanitizes the derivative term.
+
+        Args:
+            derivative (float): current raw derivative (e.g., d_D or phi_D)
+            error (float): corresponding error (e.g., d_err or phi_err)
+            bounds (dict): {"top": ..., "bot": ...} saturation limits for derivative
+            resolution (float): deadband on the underlying error; if |error| < resolution -> zero D
+            rate_limit (float or None): optional max absolute change per update for derivative
+            prev_derivative (float or None): previous post-processed derivative (needed if rate_limit is used)
+
+        Returns:
+            float: adjusted derivative
+        """
+        # Deadband: if error is below sensor resolution, ignore D
+        if abs(error) < resolution:
+            derivative = 0.0
+
+        # Saturation
+        if derivative > bounds["top"]:
+            derivative = bounds["top"]
+        elif derivative < bounds["bot"]:
+            derivative = bounds["bot"]
+
+        return derivative

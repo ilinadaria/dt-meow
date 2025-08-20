@@ -78,6 +78,16 @@ class LaneControllerNode(DTROS):
         self.params["~verbose"] = rospy.get_param("~verbose", None)
         self.params["~stop_line_slowdown"] = rospy.get_param("~stop_line_slowdown", None)
 
+        # for derivative term
+        self.params["~k_Dd"] = DTParam(
+            "~k_Dd", param_type=ParamType.FLOAT, min_value=-100.0, max_value=100.0,
+        )
+        self.params["~k_Dphi"] = DTParam(
+            "~k_Dphi", param_type=ParamType.FLOAT, min_value=-100.0, max_value=100.0
+        )
+        self.params["~deriv_type"] = rospy.get_param("~deriv_type", "error")
+
+
         # Need to create controller object before updating parameters, otherwise it will fail
         self.controller = LaneController(self.params)
         # self.updateParameters() # TODO: This needs be replaced by the new DTROS callback when it is implemented
@@ -226,7 +236,7 @@ class LaneControllerNode(DTROS):
             wheels_cmd_exec = [self.wheels_cmd_executed.vel_left, self.wheels_cmd_executed.vel_right]
             if self.obstacle_stop_line_detected:
                 v, omega = self.controller.compute_control_action(
-                    d_err, phi_err, dt, wheels_cmd_exec, self.obstacle_stop_line_distance
+                    d_err, phi_err, dt, wheels_cmd_exec, self.obstacle_stop_line_distance, pose_msg
                 )
                 # TODO: This is a temporarily fix to avoid vehicle image detection latency caused unable to stop in time.
                 v = v * 0.25
@@ -234,7 +244,7 @@ class LaneControllerNode(DTROS):
 
             else:
                 v, omega = self.controller.compute_control_action(
-                    d_err, phi_err, dt, wheels_cmd_exec, self.stop_line_distance
+                    d_err, phi_err, dt, wheels_cmd_exec, self.stop_line_distance, pose_msg
                 )
 
             # For feedforward action (i.e. during intersection navigation)
