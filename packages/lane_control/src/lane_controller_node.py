@@ -72,6 +72,7 @@ class LaneControllerNode(DTROS):
         self.params["~d_thres"] = rospy.get_param("~d_thres", None)
         self.params["~d_offset"] = rospy.get_param("~d_offset", None)
         self.params["~integral_bounds"] = rospy.get_param("~integral_bounds", None)
+        self.params["~derivative_bounds"] = rospy.get_param("~derivative_bounds", None)
         self.params["~d_resolution"] = rospy.get_param("~d_resolution", None)
         self.params["~phi_resolution"] = rospy.get_param("~phi_resolution", None)
         self.params["~omega_ff"] = rospy.get_param("~omega_ff", None)

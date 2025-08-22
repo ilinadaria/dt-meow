@@ -12,9 +12,11 @@ theta_thres_min: -0.5
 d_thres: 0.2615
 d_offset: 0.0
 
-deriv_type: "value" 
+deriv_type: "error" 
 
 omega_ff: -0.2
+omega_max: 999
+omega_min: -999
 
 integral_bounds:
   d:
