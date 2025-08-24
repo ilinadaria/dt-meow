@@ -56,7 +56,7 @@ class StopLineFilterNode(DTROS):
         if (self.state == "INTERSECTION_CONTROL") and (msg.state == "LANE_FOLLOWING"):
             self.after_intersection_work()
         self.state = msg.state
-        self.log("FSM State: " + msg.state, "error")
+        self.log("FSM State: " + msg.state, "info")
 
 
     def after_intersection_work(self):

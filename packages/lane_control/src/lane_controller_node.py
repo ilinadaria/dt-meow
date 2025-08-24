@@ -75,7 +75,7 @@ class LaneControllerNode(DTROS):
         self.params["~derivative_bounds"] = rospy.get_param("~derivative_bounds", None)
         self.params["~d_resolution"] = rospy.get_param("~d_resolution", None)
         self.params["~phi_resolution"] = rospy.get_param("~phi_resolution", None)
-        self.params["~omega_ff"] = rospy.get_param("~omega_ff", None)
+        self.params["~omega_ff"] = DTParam("~omega_ff", param_type=ParamType.FLOAT, min_value=-10, max_value=10)
         self.params["~verbose"] = rospy.get_param("~verbose", None)
         self.params["~stop_line_slowdown"] = rospy.get_param("~stop_line_slowdown", None)
 
@@ -134,8 +134,10 @@ class LaneControllerNode(DTROS):
         self.sub_obstacle_stop_line = rospy.Subscriber(
             "~obstacle_distance_reading", StopLineReading, self.cbObstacleStopLineReading, queue_size=1
         )
+        self.sub_fsm = rospy.Subscriber("~fsm_state", FSMState, self.cbMode)
 
         self.log("Initialized!")
+
 
     def cbObstacleStopLineReading(self, msg):
         """
@@ -156,19 +158,20 @@ class LaneControllerNode(DTROS):
         """
         self.stop_line_distance = np.sqrt(msg.stop_line_point.x**2 + msg.stop_line_point.y**2)
         self.stop_line_detected = msg.stop_line_detected
-        self.at_obstacle_stop_line = msg.at_stop_line
+        self.at_stop_line = msg.at_stop_line
 
     def cbMode(self, fsm_state_msg):
 
         self.fsm_state = fsm_state_msg.state  # String of current FSM state
+        self.log("State: " + fsm_state_msg.state, "info")
 
-        if self.fsm_state == "INTERSECTION_CONTROL":
+        """ if self.fsm_state == "INTERSECTION_CONTROL":
             self.current_pose_source = "intersection_navigation"
         else:
             self.current_pose_source = "lane_filter"
 
         if self.params["~verbose"] == 2:
-            self.log("Pose source: %s" % self.current_pose_source)
+            self.log("Pose source: %s" % self.current_pose_source) """
 
     def cbAllPoses(self, input_pose_msg, pose_source):
         """Callback receiving pose messages from multiple topics.
@@ -227,11 +230,11 @@ class LaneControllerNode(DTROS):
 
             # We cap the error if it grows too large
             if np.abs(d_err) > self.params["~d_thres"]:
-                self.log("d_err too large, thresholding it!", "error")
+               #  self.log("d_err too large, thresholding it!", "error")
                 d_err = np.sign(d_err) * self.params["~d_thres"]
             
             if phi_err > self.params["~theta_thres_max"].value or phi_err < self.params["~theta_thres_min"].value:
-                self.log("phi_err too large/small, thresholding it!", "error")
+                # self.log("phi_err too large/small, thresholding it!", "error")
                 phi_err = np.maximum(self.params["~theta_thres_min"].value, np.minimum(phi_err, self.params["~theta_thres_max"].value))
 
             wheels_cmd_exec = [self.wheels_cmd_executed.vel_left, self.wheels_cmd_executed.vel_right]
@@ -249,7 +252,7 @@ class LaneControllerNode(DTROS):
                 )
 
             # For feedforward action (i.e. during intersection navigation)
-            omega += self.params["~omega_ff"]
+            omega += rospy.get_param("~omega_ff", 0.0)
 
         # Initialize car control msg, add header from input message
         car_control_msg = Twist2DStamped()
