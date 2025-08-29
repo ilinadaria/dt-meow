@@ -124,7 +124,7 @@
           </include>
         </group>
     </group>
-    <!--End FSM -->>
+    <!--End FSM -->
 
 
     <!-- Start Lane Following / LF, IN-->
@@ -177,6 +177,7 @@
             <remap from="stop_line_filter_node/lanewidth" to="lane_filter_node/lanewidth"/>
             <remap from="stop_line_filter_node/lane_pose" to="lane_filter_node/lane_pose"/>
             <remap from="stop_line_filter_node/segment_list" to="ground_projection_node/lineseglist_out"/>
+            <remap from="stop_line_filter_node/fsm_mode" to="fsm_node/mode" />
             <include file="$(find stop_line_filter)/launch/stop_line_filter_node.launch">
                 <arg name="veh" value="$(arg veh)"/>
                 <arg name="param_file_name" value="$(arg param_file_name)"/>
@@ -187,7 +188,7 @@
         <group if="$(arg /lane_following/lane_controller)">
             <remap from="lane_controller_node/lane_pose" to="lane_filter_node/lane_pose"/>
             <remap from="lane_controller_node/wheels_cmd" to="wheels_driver_node/wheels_cmd" />
-            <remap from="lane_controller_node/fsm_mode" to="fsm_node/mode" />
+            <remap from="lane_controller_node/fsm_state" to="fsm_node/mode" />
             <remap from="lane_controller_node/obstacle_distance_reading" to="road_anomaly_watcher/obstacle_distance"/>
             <!-- <remap from="lane_controller_node/obstacle_avoidance_pose" to="obst_avoid/obstacle_avoidance_pose" /> -->
             <!-- <remap from="lane_controller_node/obstacle_detected" to="obstacle_avoidance_node/obstacle_avoidance_active_flag" /> -->
@@ -359,8 +360,7 @@
     <group if="$(arg unicorn_intersection)">
         <remap from="unicorn_intersection_node/fsm_state" to="fsm_node/mode"/>
         <remap from="unicorn_intersection_node/turn_type" to="intersection_navigation_node/turn_type"/>
-        <remap from="unicorn_intersection_node/intersection_go" to="coordinator_node/intersection_go"/>
-        <remap from="unicorn_intersection_node/intersection_done" to="intersection_navigation_node/intersection_done"/>
+        <remap from="unicorn_intersection_node/intersection_go" to="stop_line_filter_node/intersection_go"/>
         <remap from="unicorn_intersection_node/lane_filter_params" to="lane_filter_node/change_params"/>
         <remap from="unicorn_intersection_node/lane_controller/omega_ff" to="lane_controller_node/omega_ff"/>
         <remap from="unicorn_intersection_node/lane_controller/omega_min" to="lane_controller_node/omega_min"/>

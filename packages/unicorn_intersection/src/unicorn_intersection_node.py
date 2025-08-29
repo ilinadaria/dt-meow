@@ -15,8 +15,8 @@ class UnicornIntersectionNode:
 
         ## Internal variables
         self.state = "JOYSTICK_CONTROL"
-        self.active = False
-        self.turn_type = -1
+        self.active = True
+        self.turn_type = 2
         self.tag_id = -1
         self.forward_pose = False
 
@@ -50,8 +50,10 @@ class UnicornIntersectionNode:
         self.pub_LF_params.publish(msg)
 
     def cbIntersectionGo(self, msg):
+        # rospy.logerr("will start turning")
         rospy.loginfo("[%s] Recieved intersection go message from coordinator", self.node_name)
         if not self.active:
+            rospy.logerr("self not active")
             return
 
         if not msg.data:
@@ -78,12 +80,15 @@ class UnicornIntersectionNode:
         rospy.set_param("~lane_controller/omega_ff", omega_ffs[turn_type])
         rospy.set_param("~lane_controller/omega_max", omega_maxs[turn_type])
         rospy.set_param("~lane_controller/omega_min", omega_mins[turn_type])
+        
+        rospy.logerr("omega param chg: " + str(rospy.get_param("~lane_controller/omega_ff")))
         # Waiting for LF to adapt to new params
         rospy.sleep(1)
 
         rospy.loginfo("Starting intersection control - driving to " + str(turn_type))
         self.forward_pose = True
 
+        rospy.logerr("sleeping: " + str(sleeptimes[turn_type]))
         rospy.sleep(sleeptimes[turn_type])
 
         self.forward_pose = False
@@ -95,6 +100,7 @@ class UnicornIntersectionNode:
         msg_done = BoolStamped()
         msg_done.data = True
         self.pub_int_done.publish(msg_done)
+        rospy.logerr("intersection done published")
 
         # Publish intersection done detailed
         msg_done_detailed = TurnIDandType()

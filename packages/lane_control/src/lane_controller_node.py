@@ -148,19 +148,28 @@ class LaneControllerNode(DTROS):
         """
         self.obstacle_stop_line_distance = np.sqrt(msg.stop_line_point.x**2 + msg.stop_line_point.y**2)
         self.obstacle_stop_line_detected = msg.stop_line_detected
-        self.at_stop_line = msg.at_stop_line
+        self.at_obstacle_stop_line = msg.at_stop_line
 
+    # def cbStopLineReading(self, msg):
+    #     """Callback storing current distance to the next stopline, if one is detected.
+    #     Args:
+    #         msg (:obj:`StopLineReading`): Message containing information about the next stop line.
+    #     """
+    #     self.stop_line_distance = np.sqrt(msg.stop_line_point.x**2 + msg.stop_line_point.y**2)
+    #     self.stop_line_detected = msg.stop_line_detected
+    #     self.at_stop_line = msg.at_stop_line
     def cbStopLineReading(self, msg):
-        """Callback storing current distance to the next stopline, if one is detected.
-
-        Args:
-            msg (:obj:`StopLineReading`): Message containing information about the next stop line.
-        """
-        self.stop_line_distance = np.sqrt(msg.stop_line_point.x**2 + msg.stop_line_point.y**2)
+        if msg.stop_line_detected:
+            self.stop_line_distance = np.sqrt(msg.stop_line_point.x**2 + msg.stop_line_point.y**2)
+        else:
+            self.stop_line_distance = None
         self.stop_line_detected = msg.stop_line_detected
         self.at_stop_line = msg.at_stop_line
 
+
     def cbMode(self, fsm_state_msg):
+        rospy.logerr("HELLO")
+        rospy.logerr("lane control state : " + str(self.fsm_state))
 
         self.fsm_state = fsm_state_msg.state  # String of current FSM state
         self.log("State: " + fsm_state_msg.state, "info")
@@ -238,20 +247,24 @@ class LaneControllerNode(DTROS):
                 phi_err = np.maximum(self.params["~theta_thres_min"].value, np.minimum(phi_err, self.params["~theta_thres_max"].value))
 
             wheels_cmd_exec = [self.wheels_cmd_executed.vel_left, self.wheels_cmd_executed.vel_right]
-            if self.obstacle_stop_line_detected:
-                v, omega = self.controller.compute_control_action(
-                    d_err, phi_err, dt, wheels_cmd_exec, self.obstacle_stop_line_distance, pose_msg
-                )
-                # TODO: This is a temporarily fix to avoid vehicle image detection latency caused unable to stop in time.
-                v = v * 0.25
-                omega = omega * 0.25
+            # if self.obstacle_stop_line_detected:
+            #     v, omega = self.controller.compute_control_action(
+            #         d_err, phi_err, dt, wheels_cmd_exec, self.obstacle_stop_line_distance, pose_msg
+            #     )
+            #     # TODO: This is a temporarily fix to avoid vehicle image detection latency caused unable to stop in time.
+            #     v = v * 0.25
+            #     omega = omega * 0.25
+            if self.fsm_state == "INTERSECTION_CONTROL":
 
+                v = 0.2
+                omega = 0
             else:
                 v, omega = self.controller.compute_control_action(
                     d_err, phi_err, dt, wheels_cmd_exec, self.stop_line_distance, pose_msg
-                )
+                 )
 
             # For feedforward action (i.e. during intersection navigation)
+            # rospy.logerr("omega ff: " + rospy.get_param("~omega_ff", 0.0))
             omega += rospy.get_param("~omega_ff", 0.0)
 
         # Initialize car control msg, add header from input message
@@ -261,6 +274,9 @@ class LaneControllerNode(DTROS):
         # Add commands to car message
         car_control_msg.v = v
         car_control_msg.omega = omega
+
+
+        rospy.loginfo("v = " + str(v) + " omega = " + str(omega))
 
         self.publishCmd(car_control_msg)
         self.last_s = current_s

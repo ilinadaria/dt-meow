@@ -37,8 +37,11 @@ class StopLineFilterNode(DTROS):
         self.sub_segs = rospy.Subscriber("~segment_list", SegmentList, self.cb_segments)
         self.sub_lane = rospy.Subscriber("~lane_pose", LanePose, self.cb_lane_pose)
         self.sub_mode = rospy.Subscriber("fsm_node/mode", FSMState, self.cb_state_change)
+        self.sub_switch = rospy.Subscriber("~switch",BoolStamped, self.cbSwitch, queue_size=1)
         self.pub_stop_line_reading = rospy.Publisher("~stop_line_reading", StopLineReading, queue_size=1)
         self.pub_at_stop_line = rospy.Publisher("~at_stop_line", BoolStamped, queue_size=1)
+
+        self.pub_intersection_go = rospy.Publisher("~intersection_go", BoolStamped, queue_size=1)
 
     # def setupParam(self,param_name,default_value):
     #     value = rospy.get_param(param_name,default_value)
@@ -53,36 +56,57 @@ class StopLineFilterNode(DTROS):
     #     self.max_y         = rospy.get_param("~max_y")
 
     def cb_state_change(self, msg):
-        if (self.state == "INTERSECTION_CONTROL") and (msg.state == "LANE_FOLLOWING"):
-            self.after_intersection_work()
+        if (self.state != "INTERSECTION_CONTROL" and msg.state == "INTERSECTION_CONTROL"):
+            self.loginfo("state change detected")
+            msg2 = BoolStamped()
+            msg2.data = False
+            self.pub_at_stop_line.publish(msg2)
+            msg2.data = True
+            self.pub_intersection_go.publish(msg2)
+            self.sleep = True
+        elif (msg.state == "INTERSECTION_CONTROL"):
+            self.loginfo("intersection control")
+            msg2 = BoolStamped()
+            msg2.data = False
+            self.pub_at_stop_line.publish(msg2)
+            self.pub_intersection_go.publish(msg2)
+            self.sleep = True
+        else:
+            self.sleep = False
         self.state = msg.state
-        self.log("FSM State: " + msg.state, "info")
 
 
     def after_intersection_work(self):
-        self.loginfo("Blocking stop line detection after the intersection")
+        self.logerr("Blocking stop line detection after the intersection")
         stop_line_reading_msg = StopLineReading()
         stop_line_reading_msg.stop_line_detected = False
         stop_line_reading_msg.at_stop_line = False
         self.pub_stop_line_reading.publish(stop_line_reading_msg)
         self.sleep = True
+
+        msg = BoolStamped()
+        msg.header.stamp = stop_line_reading_msg.header.stamp
+        msg.data = False
+        self.pub_at_stop_line.publish(msg)
+
         rospy.sleep(self.off_time.value)
+        # rospy.logerr("sleep time: " + self.off_time.value.__str__())
         self.sleep = False
         self.loginfo("Resuming stop line detection after the intersection")
 
-    # def cbSwitch(self, switch_msg):
-    #     self.active = switch_msg.data
-    #     if self.active and self.state == "INTERSECTION_CONTROL":
-    #         self.after_intersection_work()
-    #
-    #
+    def cbSwitch(self, switch_msg):
+        self.active = switch_msg.data
+        if self.active and self.state == "INTERSECTION_CONTROL":
+            self.after_intersection_work()
+    
 
     def cb_lane_pose(self, lane_pose_msg):
         self.lane_pose = lane_pose_msg
 
     def cb_segments(self, segment_list_msg):
-
+        # rospy.loginfo(f"cb_segments called, self.switch exists: {hasattr(self, 'switch')}, value: {getattr(self, 'switch', None)}")
         if not self.switch or self.sleep:
+            # rospy.logerr("not detecting stop lines")
             return
 
         good_seg_count = 0
@@ -133,6 +157,10 @@ class StopLineFilterNode(DTROS):
                 msg.header.stamp = stop_line_reading_msg.header.stamp
                 msg.data = True
                 self.pub_at_stop_line.publish(msg)
+
+                self.pub_intersection_go.publish(msg)
+                self.after_intersection_work()
+                # rospy.logerr("Intersection go: " + msg.data.__str__())
 
     def to_lane_frame(self, point):
         p_homo = np.array([point.x, point.y, 1])

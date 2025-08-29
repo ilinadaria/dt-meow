@@ -12,7 +12,7 @@
 
 	    <!-- Finite state machine -->
 	    <arg name="fsm" value="true"/>
-	    <arg name="/fsm/logic_gate" value="true"/>
+	    <arg name="/fsm/logic_gate" value="false"/>
 
 		<!-- Camera and anti intagram -->
 		<arg name="anti_instagram" value="true" />

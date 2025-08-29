@@ -116,6 +116,8 @@ class LaneFilterNode(DTROS):
             param_val = params[param_name]
 
             exec("self.filter." + str(param_name) + "=" + str(param_val))  # FIXME: really?
+            val = eval("self.filter." + str(param_name))
+            rospy.logerr(str(param_name) + "=" + str(val))
 
     #    def nbSwitch(self, switch_msg):
     #        """Callback to turn on/off the node
