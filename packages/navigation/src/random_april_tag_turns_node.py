@@ -37,21 +37,23 @@ class RandomAprilTagTurnsNode:
         rospy.loginfo(f"[{self.node_name}] Initialzed.")
 
         self.rate = rospy.Rate(30)  # 10hz
+        tag_chosen = False
 
     def cbMode(self, mode_msg):
         # print mode_msg
         # TODO PUBLISH JUST ONCE
         self.fsm_mode = mode_msg.state
-        if self.fsm_mode != mode_msg.INTERSECTION_CONTROL:
+        if self.fsm_mode != "INTERSECTION_COORDINATION":
             self.turn_type = -1
             self.pub_turn_type.publish(self.turn_type)
+            tag_chosen = False
             # rospy.loginfo("Turn type now: %i" %(self.turn_type))
 
     def cbTag(self, tag_msgs):
         if (
-            self.fsm_mode == "INTERSECTION_CONTROL"
+            (self.fsm_mode == "INTERSECTION_CONTROL"
             or self.fsm_mode == "INTERSECTION_COORDINATION"
-            or self.fsm_mode == "INTERSECTION_PLANNING"
+            or self.fsm_mode == "INTERSECTION_PLANNING") and not tag_chosen
         ):
             # loop through list of april tags
 
@@ -99,6 +101,7 @@ class RandomAprilTagTurnsNode:
 
                     # rospy.loginfo("possible turns %s." %(availableTurns))
                     # rospy.loginfo("Turn type now: %i" %(self.turn_type))
+                tag_chosen = True
 
     def setupParameter(self, param_name, default_value):
         value = rospy.get_param(param_name, default_value)
