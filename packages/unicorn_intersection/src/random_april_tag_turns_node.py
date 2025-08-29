@@ -26,7 +26,7 @@ class RandomAprilTagTurnsNode:
         # Setup subscribers
         # self.sub_topic_b = rospy.Subscriber("~topic_b", String, self.cbTopic)
         self.sub_topic_mode = rospy.Subscriber("~mode", FSMState, self.cbMode, queue_size=1)
-        # self.fsm_mode = None #TODO what is this?
+        self.fsm_mode = None #TODO what is this?
         self.sub_topic_tag = rospy.Subscriber("~tag", AprilTagsWithInfos, self.cbTag, queue_size=1)
 
         # Read parameters
@@ -46,14 +46,14 @@ class RandomAprilTagTurnsNode:
         if self.fsm_mode != "INTERSECTION_COORDINATION":
             self.turn_type = -1
             self.pub_turn_type.publish(self.turn_type)
-            tag_chosen = False
+            self.tag_chosen = False
             # rospy.loginfo("Turn type now: %i" %(self.turn_type))
 
     def cbTag(self, tag_msgs):
         if (
             (self.fsm_mode == "INTERSECTION_CONTROL"
             or self.fsm_mode == "INTERSECTION_COORDINATION"
-            or self.fsm_mode == "INTERSECTION_PLANNING") and not tag_chosen
+            or self.fsm_mode == "INTERSECTION_PLANNING") and not self.tag_chosen
         ):
             # loop through list of april tags
 

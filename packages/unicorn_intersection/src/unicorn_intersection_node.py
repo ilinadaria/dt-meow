@@ -16,7 +16,7 @@ class UnicornIntersectionNode:
         ## Internal variables
         self.state = "JOYSTICK_CONTROL"
         self.active = True
-        self.turn_type = 2
+        self.turn_type = -1
         self.tag_id = -1
         self.forward_pose = False
 
@@ -119,6 +119,8 @@ class UnicornIntersectionNode:
 
     def cbTurnType(self, msg):
         self.tag_id = msg.tag_id
+        self.turn_type = msg.turn_type
+        rospy.logerr(str(self.tag_id))
         if self.turn_type == -1:
             self.turn_type = msg.turn_type
         if self.debug_dir != -1:
