@@ -35,6 +35,7 @@ class UnicornIntersectionNode:
         self.pub_int_done_detailed = rospy.Publisher(
             "~intersection_done_detailed", TurnIDandType, queue_size=1
         )
+        self.pub_at_stop_sign = rospy.Publisher("~at_stop_sign", BoolStamped, queue_size=1)
 
         ## update Parameters timer
         self.params_update = rospy.Timer(rospy.Duration.from_sec(1.0), self.updateParams)
@@ -59,13 +60,28 @@ class UnicornIntersectionNode:
         if not msg.data:
             return
 
-        while self.turn_type == -1:
+        while self.tag_id == -1:
             if not self.active:
                 return
             rospy.loginfo(
                 "[%s] Requested to start intersection, but we do not see an april tag yet.", self.node_name
             )
             rospy.sleep(2)
+        
+        #tag id is not -1 and turn type is -1 -> stop sign
+        if self.turn_type == -1:
+            rospy.logerr("HELLO")
+            rospy.logerr("stop sign")
+            msg_done = BoolStamped()
+            msg_done.data = True
+            self.pub_at_stop_sign.publish(msg_done) # publish true at stop sign
+            rospy.logerr("stop published")
+            rospy.sleep(7)
+            msg_done.data = False
+            self.pub_at_stop_sign.publish(msg_done) # publish false at stop line
+            rospy.sleep(7)
+            return
+            
 
         tag_id = self.tag_id
         turn_type = self.turn_type
@@ -120,11 +136,8 @@ class UnicornIntersectionNode:
     def cbTurnType(self, msg):
         self.tag_id = msg.tag_id
         self.turn_type = msg.turn_type
-        rospy.logerr(str(self.tag_id))
-        if self.turn_type == -1:
-            self.turn_type = msg.turn_type
-        if self.debug_dir != -1:
-            self.turn_type = self.debug_dir
+
+        rospy.logerr("tag_id " + str(self.tag_id) + " trun_type: " + str(self.turn_type))
 
     def setupParams(self):
         self.time_left_turn = self.setupParam("~time_left_turn", 2)

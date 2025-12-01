@@ -106,6 +106,7 @@ class LaneControllerNode(DTROS):
         self.obstacle_stop_line_distance = None
         self.obstacle_stop_line_detected = False
         self.at_obstacle_stop_line = False
+        self.at_stop_sign = False
 
         self.current_pose_source = "lane_filter"
 
@@ -135,8 +136,13 @@ class LaneControllerNode(DTROS):
             "~obstacle_distance_reading", StopLineReading, self.cbObstacleStopLineReading, queue_size=1
         )
         self.sub_fsm = rospy.Subscriber("~fsm_state", FSMState, self.cbMode)
+        self.sub_at_stop_sign = rospy.Subscriber("~at_stop_sign", BoolStamped, self.cbStopSign)
 
         self.log("Initialized!")
+    
+    def cbStopSign(self, msg):
+        self.at_stop_sign = msg.data
+        rospy.logerr("At stop sign: " + str(self.at_stop_sign))
 
 
     def cbObstacleStopLineReading(self, msg):
@@ -168,7 +174,7 @@ class LaneControllerNode(DTROS):
 
 
     def cbMode(self, fsm_state_msg):
-        rospy.logerr("HELLO")
+        # rospy.logerr("HELLO")
         rospy.logerr("lane control state : " + str(self.fsm_state))
 
         self.fsm_state = fsm_state_msg.state  # String of current FSM state
@@ -228,10 +234,12 @@ class LaneControllerNode(DTROS):
         if self.last_s is not None:
             dt = current_s - self.last_s
 
-        if self.at_stop_line or self.at_obstacle_stop_line:
+        if self.at_stop_line or self.at_obstacle_stop_line or self.at_stop_sign:
+            rospy.logerr("STOP")
             v = 0
             omega = 0
         else:
+            # rospy.logerr("NOT STOPPING")
 
             # Compute errors
             d_err = pose_msg.d - self.params["~d_offset"]
@@ -276,7 +284,7 @@ class LaneControllerNode(DTROS):
         car_control_msg.omega = omega
 
 
-        rospy.loginfo("v = " + str(v) + " omega = " + str(omega))
+        # rospy.loginfo("v = " + str(v) + " omega = " + str(omega))
 
         self.publishCmd(car_control_msg)
         self.last_s = current_s
