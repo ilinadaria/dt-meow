@@ -36,6 +36,7 @@ class ObjectDetectionNode(DTROS):
         self.initialized = True
         self.log("Initialized!")
 
+# this callback should be changed to a different logic (for traffic signs)
     def image_cb(self, image_msg):
         if not self.initialized:
             return

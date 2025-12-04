@@ -408,6 +408,17 @@
     </group>
     <!-- End anti-instagram -->
 
+    <!-- Start Object Detection -->
+    <group if="$(arg object_detection)">
+        <remap from="object_detection_node/image/compressed" to="camera_node/image/compressed"/>
+        <include file="$(find object_detection)/launch/object_detection_node.launch">
+            <arg name="veh" value="$(arg veh)"/>
+            <arg name="AIDO_eval" value="$(arg object_detection/AIDO_eval)"/>
+        </include>
+    </group>
+    <!-- End object detection -->
+
+
 
     <!-- Start Parallel Autonomy -->
     <!-- TODO fix or remove

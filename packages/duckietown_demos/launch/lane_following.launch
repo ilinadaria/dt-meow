@@ -38,6 +38,8 @@ LP removing for now
 		<arg name="apriltags" value="true" />
 		<arg name="apriltags_random" value="true" />
 
+		<arg name="object_detection" value="true"/>
+
 
 
 		<remap from="lane_controller_node/stop_line_reading" to="stop_line_filter_node/stop_line_reading" />
