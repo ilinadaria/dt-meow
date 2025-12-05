@@ -74,6 +74,9 @@
     <arg name="statistics" default="false"/>
     <arg name="enable_statistics" default="$(arg statistics)"/>
     <arg name="maintenance_control" default="false"/>
+
+    <arg name="object_detection" default="false"/>
+    <arg name="object_detection/AIDO_eval" default="false"/>
     <!-- end switch args -->
 
 
