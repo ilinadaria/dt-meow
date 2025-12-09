@@ -112,19 +112,18 @@ class ObjectDetectionNode(DTROS):
         self.visualize_detections(rgb, bboxes, classes)
 
     def visualize_detections(self, rgb, bboxes, classes):
-        colors = {0: (0, 255, 255), 1: (0, 165, 255)}
-        names = {0: "duckie", 1: "duckiebot"}
+        colors = {0: (0, 255, 255), 1: (0, 165, 255), 2: (255, 0, 0), 3: (0, 255, 0), 4: (255, 0, 255), 5: (255, 255, 0),}
+        names = {0: "4-way-intersect", 1: "t-intersection", 2: "duckie", 3: "no-left-turn", 4: "no-right-turn", 5: "stop"}
         font = cv2.FONT_HERSHEY_SIMPLEX
         
         for clas, box in zip(classes, bboxes):
-            if clas in [0, 1]:
-                pt1 = tuple(map(int, box[:2]))
-                pt2 = tuple(map(int, box[2:]))
-                color = tuple(reversed(colors[clas]))
-                name = names[clas]
-                rgb = cv2.rectangle(rgb, pt1, pt2, color, 2)
-                text_location = (pt1[0], min(pt2[1] + 30, IMAGE_SIZE))
-                rgb = cv2.putText(rgb, name, text_location, font, 1, color, thickness=2)
+            pt1 = tuple(map(int, box[:2]))
+            pt2 = tuple(map(int, box[2:]))
+            color = tuple(reversed(colors[clas]))
+            name = names[clas]
+            rgb = cv2.rectangle(rgb, pt1, pt2, color, 2)
+            text_location = (pt1[0], min(pt2[1] + 30, IMAGE_SIZE))
+            rgb = cv2.putText(rgb, name, text_location, font, 1, color, thickness=2)
             
         bgr = rgb[..., ::-1]
         obj_det_img = self.bridge.cv2_to_compressed_imgmsg(bgr)
