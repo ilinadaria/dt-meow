@@ -4,6 +4,8 @@ from typing import Tuple
 import numpy as np
 
 import torch
+import subprocess
+from ultralytics import YOLO
 
 from dt_data_api import DataClient
 from solution.integration_activity import MODEL_NAME, DT_TOKEN
@@ -13,6 +15,7 @@ from dt_device_utils import DeviceHardwareBrand, get_device_hardware_brand
 from .constants import IMAGE_SIZE, ASSETS_DIR
 
 JETSON_FP16 = True
+
 
 
 def run(input, exception_on_failure=False):
@@ -51,6 +54,7 @@ class Wrapper:
                 # when running on the robot, we store models in the persistent `data` directory
                 models_path = "/data/nn_models"
                 weight_file_path = os.path.join(models_path, f"{model_name}.pt")
+                
 
             # make models destination dir if it does not exist
             if not os.path.exists(models_path):
@@ -101,22 +105,40 @@ class Wrapper:
 
         # load pytorch model
         self.model = Model(weight_file_path)
+        print("Loaded YOLO classes:")
+        for i, name in self.model.model.names.items():
+            print(i, ":", name)
+
 
     def predict(self, image: np.ndarray) -> Tuple[list, list, list]:
         return self.model.infer(image)
 
-
 class Model:
     def __init__(self, weight_file_path: str):
+        print("HELLO")
         super().__init__()
 
+        print("HIIII")
+
+        if not os.path.exists("/yolov5/hubconf.py"):
+            print("Cloning YOLOv5...")
+            subprocess.check_call("git clone -b v6.2 https://github.com/ultralytics/yolov5.git /yolov5", shell=True)
+
         model = torch.hub.load("/yolov5", "custom", path=weight_file_path, source="local")
+        #model = YOLO(weight_file_path)
         model.eval()
 
-        use_fp16: bool = JETSON_FP16 and get_device_hardware_brand() == DeviceHardwareBrand.JETSON_NANO
+        print(model)
+
+
+        use_fp16 = (JETSON_FP16 and torch.cuda.is_available() and get_device_hardware_brand() == DeviceHardwareBrand.JETSON_NANO)
 
         if use_fp16:
+            print("Using FP16")
             model = model.half()
+        else:
+            print("Using FP32")
+
 
         if torch.cuda.is_available():
             self.model = model.cuda()
@@ -126,6 +148,7 @@ class Model:
         del model
 
     def infer(self, image: np.ndarray) -> Tuple[list, list, list]:
+        print("HIII")
         det = self.model(image, size=IMAGE_SIZE)
 
         xyxy = det.xyxy[0]  # grabs det of first image (aka the only image we sent to the net)

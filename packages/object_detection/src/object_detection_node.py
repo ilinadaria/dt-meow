@@ -1,4 +1,4 @@
-client#!/usr/bin/env python3
+#!/usr/bin/env python3
 import cv2
 import numpy as np
 import os
@@ -56,6 +56,9 @@ class ObjectDetectionNode(DTROS):
         rgb = cv2.resize(rgb, (IMAGE_SIZE, IMAGE_SIZE))
 
         bboxes, classes, scores = self.model_wrapper.predict(rgb)
+        for cls, bbox, score in zip(classes, bboxes, scores):
+            print(f"cls={cls}, bbox={bbox}, score={score}")
+
 
         # Stop logic for ducks and duckiebots
         stop_signal = False
@@ -99,7 +102,7 @@ class ObjectDetectionNode(DTROS):
             else:
                 self.log("Stopping for duck and duckiebot.")
         else:
-            vel_cmd.v = 0.2
+            vel_cmd.v = 0
             vel_cmd.omega = 0.0
             self.log("Driving...")
         
