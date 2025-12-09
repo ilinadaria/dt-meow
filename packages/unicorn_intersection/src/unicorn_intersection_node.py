@@ -125,7 +125,7 @@ class UnicornIntersectionNode:
         self.pub_int_done_detailed.publish(msg_done_detailed)
 
     def cbFSMState(self, msg):
-        if self.state != msg.state and msg.state == "INTERSECTION_COORDINATION":
+        if self.state != msg.state and msg.state == "INTERSECTION_CONTROL":
             self.turn_type = -1
 
         self.state = msg.state

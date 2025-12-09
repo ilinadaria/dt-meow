@@ -4,7 +4,7 @@ import numpy as np
 import os
 import rospy
 from duckietown.dtros import DTROS, NodeType
-from duckietown_msgs.msg import Twist2DStamped
+from duckietown_msgs.msg import Twist2DStamped, TurnIDandType, FSMState
 from cv_bridge import CvBridge
 from sensor_msgs.msg import CompressedImage
 from nn_model.constants import IMAGE_SIZE
@@ -21,6 +21,7 @@ class ObjectDetectionNode(DTROS):
         self.veh = os.environ['VEHICLE_NAME']
         self.pub_vel = rospy.Publisher(f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1)
         self.pub_detections_image = rospy.Publisher("~image/compressed", CompressedImage, queue_size=1)
+        self.pub_id_and_type = rospy.Publisher("~turn_id_and_type", TurnIDandType, queue_size=1, latch=True)
         
         self.sub_image = rospy.Subscriber(
             f"/{self.veh}/camera_node/image/compressed",
@@ -29,6 +30,8 @@ class ObjectDetectionNode(DTROS):
             buff_size=10000000,
             queue_size=1,
         )
+
+        self.sub_topic_mode = rospy.Subscriber("~mode", FSMState, self.cbMode, queue_size=1)
 
         self.bridge = CvBridge()
         self.model_wrapper = Wrapper(rospy.get_param("~AIDO_eval", False))
@@ -52,7 +55,7 @@ class ObjectDetectionNode(DTROS):
             self.logerr(f"Could not decode image: {e}")
             return
 
-        rgb = bgr[..., ::-1]
+        rgb = bgr[..., ::-1] # reverse from bgr to rgb
         rgb = cv2.resize(rgb, (IMAGE_SIZE, IMAGE_SIZE))
 
         bboxes, classes, scores = self.model_wrapper.predict(rgb)
@@ -74,12 +77,13 @@ class ObjectDetectionNode(DTROS):
             # Calculate center of bounding box
             center_x = (bbox[0] + bbox[2]) / 2
 
-            if cls == 0 and score > 0.7:  # Duck
+            if cls == 5 and score > 0.5:  # Duck
                 area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
-                if area > 2000 and left_boundary < center_x < right_boundary:
+                print("AREA : " + str(area))
+                if area > 500 and left_boundary < center_x < right_boundary:
                     stop_signal = True
                     large_duck = True
-                    self.log(f"Duck detected. Area: {area}")
+                    self.log(f"Stop sign")
 
             if cls == 1 and score > 0.7:  # Duckiebot
                 area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
@@ -109,18 +113,18 @@ class ObjectDetectionNode(DTROS):
         self.pub_vel.publish(vel_cmd)
 
 
-        self.visualize_detections(rgb, bboxes, classes)
+        self.visualize_detections(rgb, bboxes, classes, scores)
 
-    def visualize_detections(self, rgb, bboxes, classes):
+    def visualize_detections(self, rgb, bboxes, classes, scores):
         colors = {0: (0, 255, 255), 1: (0, 165, 255), 2: (255, 0, 0), 3: (0, 255, 0), 4: (255, 0, 255), 5: (255, 255, 0),}
         names = {0: "4-way-intersect", 1: "t-intersection", 2: "duckie", 3: "no-left-turn", 4: "no-right-turn", 5: "stop"}
         font = cv2.FONT_HERSHEY_SIMPLEX
         
-        for clas, box in zip(classes, bboxes):
+        for clas, box, score in zip(classes, bboxes, scores):
             pt1 = tuple(map(int, box[:2]))
             pt2 = tuple(map(int, box[2:]))
-            color = tuple(reversed(colors[clas]))
-            name = names[clas]
+            color = tuple(reversed(colors[clas])) # opencv expects bgr
+            name = names[clas] + " " + str(int(score * 100)) + "%"
             rgb = cv2.rectangle(rgb, pt1, pt2, color, 2)
             text_location = (pt1[0], min(pt2[1] + 30, IMAGE_SIZE))
             rgb = cv2.putText(rgb, name, text_location, font, 1, color, thickness=2)

@@ -1,3 +1,4 @@
 # dt-meow
 
-Code that runs the core stack on the Duckiebot in ROS.
+autonomous navigation with traffic sign recognition using YOLOv5  
+meow ^.^
