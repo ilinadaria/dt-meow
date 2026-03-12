@@ -2,7 +2,7 @@ import os
 from typing import Tuple
 
 import numpy as np
-
+from collections import deque
 import torch
 import subprocess
 from ultralytics import YOLO
@@ -54,9 +54,116 @@ class Wrapper:
         print("Loaded YOLO classes:")
         for i, name in self.model.model.names.items():
             print(i, ":", name)
+        
+        self.sign_filter = SignCVaRFilter(IMAGE_SIZE)
 
     def predict(self, image: np.ndarray) -> Tuple[list, list, list]:
         return self.model.infer(image)
+    
+    def predict_and_filter(self, image: np.ndarray):
+        bboxes, classes, scores = self.model.infer(image)
+        trusted_classes, trusted_bboxes, trusted_scores = self.sign_filter.update(bboxes, classes, scores)
+
+        return trusted_bboxes, trusted_classes, trusted_scores
+
+class SignCVaRFilter:
+    def __init__(self, image_size):
+        self.image_size = image_size
+        self.sign_classes = [0, 1, 3, 4, 5]
+
+        self.history_len = 10
+        self.alpha = 0.80
+        self.min_history = 5
+
+        self.histories = {
+            cls: deque(maxlen=self.history_len)
+            for cls in self.sign_classes
+        }
+
+        self.score_thresholds = {
+            0: 0.40,
+            1: 0.40,
+            3: 0.45,
+            4: 0.45,
+            5: 0.50,
+        }
+
+        self.cvar_thresholds = {
+            0: 0.22,
+            1: 0.22,
+            3: 0.25,
+            4: 0.25,
+            5: 0.30,
+        }
+
+    def _bbox_center_x(self, bbox):
+        x1, _, x2, _ = bbox
+        return 0.5 * (float(x1) + float(x2))
+
+    def sign_strength(self, bbox, score):
+        area = max(0.0, float(x2 - x1)) * max(0.0, float(y2 - y1))
+        norm_area = area / float(self.image_size * self.image_size)
+
+        center_x = self._bbox_center_x(bbox)
+        image_center_x = self.image_size / 2.0
+        center_offset = abs(center_x - image_center_x) / max(image_center_x, 1.0)
+        center_weight = max(0.0, 1.0 - center_offset)
+
+        return float(score) * norm_area * center_weight * 10.0
+
+    def compute_var_cvar(self, samples, alpha):
+        if len(samples) == 0:
+            return 0.0, 0.0
+
+        arr = np.asarray(samples, dtype=np.float32)
+        var_alpha = float(np.quantile(arr, alpha))
+        tail = arr[arr >= var_alpha]
+
+        if tail.size == 0:
+            cvar_alpha = var_alpha
+        else:
+            cvar_alpha = float(np.mean(tail))
+
+        return var_alpha, cvar_alpha
+
+    def update(self, bboxes, classes, scores):
+        frame_strength = {cls: 0.0 for cls in self.sign_classes}
+        frame_bbox = {cls: None for cls in self.sign_classes}
+        frame_score = {cls: 0.0 for cls in self.sign_classes}
+
+        for cls, bbox, score in zip(classes, bboxes, scores):
+            cls = int(cls)
+
+            if score < self.score_thresholds[cls]:
+                continue
+
+            strength = self.sign_strength(bbox, score)
+            if strength > frame_strength[cls]:
+                frame_strength[cls] = strength
+                frame_bbox[cls] = bbox
+                frame_score[cls] = score
+
+        for cls in self.sign_classes:
+            self.histories[cls].append(frame_strength[cls])
+
+        trusted_classes = []
+        trusted_bboxes = []
+        trusted_scores = []
+        stats = {}
+
+        for cls in self.sign_classes:
+            history = list(self.histories[cls])
+            var_alpha, cvar_alpha = self.compute_var_cvar(history, self.alpha)
+
+            enough_history = len(history) >= self.min_history
+            trusted = cvar_alpha > self.cvar_thresholds[cls]
+
+            if enough_history and trusted:
+                trusted_classes.append(cls)
+                trusted_bboxes.append(frame_bbox[cls])
+                trusted_scores.append(frame_score[cls])
+
+        return trusted_classes, trusted_bboxes, trusted_scores
 
 class Model:
     def __init__(self, weight_file_path: str):
