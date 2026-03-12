@@ -104,14 +104,14 @@ class ObjectDetectionNode(DTROS):
                     stop_signal = True
                     large_duck = True
                     self.log(f"Stop sign")
-            else:
-                self.publish_fake_apriltag_detections(image_msg, bboxes, classes, scores)
+        
 
         # Create velocity command
         vel_cmd = Twist2DStamped()
         vel_cmd.header.stamp = rospy.Time.now()
         
         if stop_signal:
+            # change state
             vel_cmd.v = 0.0
             vel_cmd.omega = 0.0
             if large_duck and not large_duckiebot:
@@ -122,6 +122,11 @@ class ObjectDetectionNode(DTROS):
                 self.log("Stopping for duck and duckiebot.")
             
             self.pub_vel.publish(vel_cmd)
+
+            # change state back
+
+        else:
+            self.publish_fake_apriltag_detections(image_msg, bboxes, classes, scores)
 
 
         self.visualize_detections(rgb, bboxes, classes, scores)
