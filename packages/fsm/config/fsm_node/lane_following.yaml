@@ -24,6 +24,14 @@ events: # Maps from subscribing topic to signal ids
     topic: "unicorn_intersection_node/intersection_done"
     msg_type: "BoolStamped"
     trigger: True
+  duck_detected:
+    topic: "object_detection_node/duck_detected"
+    msg_type: "BoolStamped"
+    trigger: True
+  duck_gone:
+    topic: "object_detection_node/duck_detected"
+    msg_type: "BoolStamped"
+    trigger: False
 
 
 # Define nodes
@@ -61,7 +69,7 @@ states:
       - line_detector_node
       - ground_projection_node
       - led_emitter_node
-      - apriltag_detector_node
+      - object_detection_node
       - apriltag_postprocessing_node
       - random_april_tag_turns_node
     lights: "GREEN"
@@ -70,6 +78,7 @@ states:
   LANE_FOLLOWING:
     transitions:
       at_stop_line: "AT_STOP_LINE"
+      duck_detected: "OBSTACLE"
     active_nodes:
       - anti_instagram
       - line_detector_node
@@ -84,6 +93,7 @@ states:
   AT_STOP_LINE:
     transitions:
       intersection_go: "INTERSECTION_CONTROL"
+      duck_detected: "OBSTACLE"
     active_nodes:
       - anti_instagram
       - line_detector_node
@@ -92,7 +102,7 @@ states:
       - led_emitter_node
       - unicorn_intersection_node
       - random_april_tag_turns_node
-      - apriltag_detector_node
+      - object_detection_node
       - apriltag_postprocessing_node
       - stop_line_filter_node
     lights: "BLUE"
@@ -100,6 +110,7 @@ states:
   INTERSECTION_CONTROL:
     transitions:
       intersection_done: "LANE_FOLLOWING"
+      duck_detected: "OBSTACLE"
     active_nodes:
       - anti_instagram
       - line_detector_node
@@ -107,7 +118,15 @@ states:
       - unicorn_intersection_node
       - led_emitter_node
       - ground_projection_node
-      - apriltag_detector_node
+      - object_detection_node
       - apriltag_postprocessing_node
     lights: "RED"
+
+  OBSTACLE:
+    transitions:
+      duck_gone: "LANE_FOLLOWING"
+    active_nodes:
+      - object_detection_node
+      - led_emitter_node
+      - anti_instagram
 
