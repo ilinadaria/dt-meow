@@ -4,6 +4,9 @@ k_d: -2.0
 k_theta: -3.0
 k_Id: -3.0
 k_Iphi: 0.0
+
+k_Dd: -0.1
+k_Dphi: -0.2
 theta_thres_max: 0.75  #0.523
 theta_thres_min: -0.5
 d_thres: 0.2615

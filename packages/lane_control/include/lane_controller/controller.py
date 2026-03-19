@@ -64,6 +64,8 @@ class LaneController:
 
         if dt is not None:
             self.integrate_errors(d_err, phi_err, dt)
+            d_D = (d_err - self.prev_d_err) / dt
+            phi_D = (phi_err - self.prev_phi_err) / dt
 
         self.d_I = self.adjust_integral(
             d_err, self.d_I, self.parameters["~integral_bounds"]["d"], self.parameters["~d_resolution"]
@@ -83,6 +85,8 @@ class LaneController:
             + self.parameters["~k_theta"].value * phi_err
             + self.parameters["~k_Id"].value * self.d_I
             + self.parameters["~k_Iphi"].value * self.phi_I
+            + self.parameters["~k_Dd"].value * d_D
+            + self.parameters["~k_Dphi"].value * phi_D
         )
 
         self.prev_d_err = d_err
