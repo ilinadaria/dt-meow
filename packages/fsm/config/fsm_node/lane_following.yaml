@@ -46,7 +46,7 @@ nodes:
   stop_line_filter_node: "stop_line_filter_node/switch"
   unicorn_intersection_node: "unicorn_intersection_node/switch" #NOTE a.k.a. semi closed loop intersection navigation
   random_april_tag_turns_node: "random_april_tag_turns_node/switch"
-  apriltag_detector_node: "apriltag_detector_node/switch"
+  object_detection_node: "object_detection_node/switch"
 
 
 
@@ -70,7 +70,6 @@ states:
       - ground_projection_node
       - led_emitter_node
       - object_detection_node
-      - apriltag_postprocessing_node
       - random_april_tag_turns_node
     lights: "GREEN"
 
@@ -103,7 +102,6 @@ states:
       - unicorn_intersection_node
       - random_april_tag_turns_node
       - object_detection_node
-      - apriltag_postprocessing_node
       - stop_line_filter_node
     lights: "BLUE"
   
@@ -119,7 +117,6 @@ states:
       - led_emitter_node
       - ground_projection_node
       - object_detection_node
-      - apriltag_postprocessing_node
     lights: "RED"
 
   OBSTACLE:
