@@ -73,7 +73,7 @@ class SignCVaRFilter:
 
         self.history_len = 10
         self.alpha = 0.80
-        self.min_history = 5
+        self.min_history = 3
 
         self.histories = {
             cls: deque(maxlen=self.history_len)
@@ -81,19 +81,19 @@ class SignCVaRFilter:
         }
 
         self.score_thresholds = {
-            0: 0.40,
-            1: 0.40,
+            0: 0.60,
+            1: 0.60,
             3: 0.45,
-            4: 0.45,
+            4: 0.60,
             5: 0.50,
         }
 
         self.cvar_thresholds = {
-            0: 0.22,
-            1: 0.22,
-            3: 0.25,
+            0: 0.25,
+            1: 0.25,
+            3: 0.15,
             4: 0.25,
-            5: 0.30,
+            5: 0.15,
         }
 
     def _bbox_center_x(self, bbox):
@@ -101,6 +101,7 @@ class SignCVaRFilter:
         return 0.5 * (float(x1) + float(x2))
 
     def sign_strength(self, bbox, score):
+        x1, y1, x2, y2 = bbox
         area = max(0.0, float(x2 - x1)) * max(0.0, float(y2 - y1))
         norm_area = area / float(self.image_size * self.image_size)
 
@@ -116,8 +117,10 @@ class SignCVaRFilter:
             return 0.0, 0.0
 
         arr = np.asarray(samples, dtype=np.float32)
-        var_alpha = float(np.quantile(arr, alpha))
-        tail = arr[arr >= var_alpha]
+
+        # lower-tail VaR: cutoff for the weakest (1 - alpha) fraction
+        var_alpha = float(np.quantile(arr, 1.0 - alpha))
+        tail = arr[arr <= var_alpha]
 
         if tail.size == 0:
             cvar_alpha = var_alpha
