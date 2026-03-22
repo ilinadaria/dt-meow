@@ -22,7 +22,7 @@ from geometry_msgs.msg import Transform, Vector3, Quaternion
 
 class ObjectDetectionNode(DTROS):
     def __init__(self, node_name):
-        super(ObjectDetectionNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION)
+        super(ObjectDetectionNode, self).__init__(node_name=node_name, node_type=NodeType.PERCEPTION, fsm_controlled=True)
         
         self.initialized = False
         self.frame_id = 0
@@ -31,7 +31,9 @@ class ObjectDetectionNode(DTROS):
         self.pub_vel = rospy.Publisher(f"/{self.veh}/car_cmd_switch_node/cmd", Twist2DStamped, queue_size=1)
         self.pub_detections_image = rospy.Publisher("~image/compressed", CompressedImage, queue_size=1)
         self.pub_detection = rospy.Publisher("~sign", Int16, queue_size = 1)
-        self.publish_fake_apriltag_detections("~detections", AprilTagDetectionArray, queue_size=1)
+        self.publish_fake_apriltag_detections = rospy.Publisher("~detections", AprilTagDetectionArray, queue_size=1)
+        self.pub_duck_det = rospy.Publisher("~duck_detected", BoolStamped, queue_size=1)
+
         
         
         self.sub_image = rospy.Subscriber(
@@ -84,9 +86,7 @@ class ObjectDetectionNode(DTROS):
 
 
         # Stop logic for ducks and duckiebots
-        stop_signal = False
-        large_duck = False
-        large_duckiebot = False
+        duck = False
 
         # Define the left and right boundaries of the center region
         left_boundary = int(IMAGE_SIZE * 0.33)
@@ -101,8 +101,7 @@ class ObjectDetectionNode(DTROS):
                 area = (bbox[2] - bbox[0]) * (bbox[3] - bbox[1])
                 print("AREA : " + str(area))
                 if area > 500 and left_boundary < center_x < right_boundary:
-                    stop_signal = True
-                    large_duck = True
+                    duck = True
                     self.log(f"Stop sign")
         
 
@@ -110,22 +109,20 @@ class ObjectDetectionNode(DTROS):
         vel_cmd = Twist2DStamped()
         vel_cmd.header.stamp = rospy.Time.now()
         
-        if stop_signal:
+        if duck:
             # change state
+            msg = BoolStamped()
+            msg.data = True
+            self.pub_duck_det.publish(msg)
             vel_cmd.v = 0.0
             vel_cmd.omega = 0.0
-            if large_duck and not large_duckiebot:
-                self.log("Stopping for Duck.")
-            elif large_duckiebot and not large_duck:
-                self.log("Stopping for Duckiebot.")
-            else:
-                self.log("Stopping for duck and duckiebot.")
             
             self.pub_vel.publish(vel_cmd)
-
             # change state back
-
         else:
+            msg = BoolStamped()
+            msg.data = False
+            self.pub_duck_det.publish(msg)
             self.publish_fake_apriltag_detections(image_msg, bboxes, classes, scores)
 
 
@@ -150,7 +147,7 @@ class ObjectDetectionNode(DTROS):
         self.pub_detections_image.publish(obj_det_img)
 
     def bbox_to_fake_apriltag_pose(self, bbox):
-        # VERY rough transation from bbox to camera pose, since we only use it for random_apriltags node
+        # VERY rough transation from bbox to camera pose
 
         x1, y1, x2, y2 = bbox
 

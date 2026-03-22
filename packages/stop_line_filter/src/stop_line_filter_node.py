@@ -127,3 +127,4 @@ class StopLineFilterNode(DTROS):
 if __name__ == "__main__":
     lane_filter_node = StopLineFilterNode(node_name="stop_line_filter_node")
     rospy.spin()
+ 
