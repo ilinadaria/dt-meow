@@ -71,7 +71,7 @@ class SignCVaRFilter:
         self.image_size = image_size
         self.sign_classes = [0, 1, 3, 4, 5]
 
-        self.history_len = 10
+        self.history_len = 5
         self.alpha = 0.80
         self.min_history = 3
 
